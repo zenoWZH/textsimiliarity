@@ -1,0 +1,7 @@
+# all data
+*.npy
+*.xml
+*.bin
+*.txt
+*.csv
+*.w2v

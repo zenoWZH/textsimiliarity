@@ -1,0 +1,6 @@
+# all data
+.ipynb_checkpoints/
+.python-version
+data/
+*.txt
+*.csv
