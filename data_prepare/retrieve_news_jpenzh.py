@@ -17,6 +17,17 @@ from nltk.corpus.reader.wordnet import WordNetError
 from nltk.corpus import wordnet as wn
 from nltk import *
 
+#for ZH jieba
+from string import punctuation 
+import jieba
+jieba.set_dictionary('/home/R2016hwang/dictionary/jieba/dict.txt.big')
+add_punc='，。、【】“”：；（）《》‘’{}？！⑦()、%^>℃：.”“^-——=&#@￥'
+all_punc=punctuation+add_punc+' '+'\n'
+
+stopwords_file= "/home/R2016hwang/dictionary/zhstopwords.txt"
+stop_f = open(stopwords_file,"r",encoding='utf-8')
+stop_words = [w.strip('\n').strip() for w in stop_f.readlines()]
+
 retrieve_from_db = False
 preprocessing = False
 textout = False
@@ -30,6 +41,7 @@ month_start = 1
 month_end =  12
 year = 2014
 period = ["%.2d" % i for i in range(month_start, month_end+1)]
+#period = ["%.2d" % i for i in range(month_start, month_start+1)]  #for test
 
 column_need = ["PNAC", "UNIQUE_STORY_INDEX", "HEADLINE_ALERT_TEXT", "TAKE_TEXT",
                "corrected","update_code","reference_code"]
@@ -37,8 +49,11 @@ column_need_JP = ["PNAC_JP", "UNIQUE_STORY_INDEX_JP", "HEADLINE_ALERT_TEXT_JP",
                   "TAKE_TEXT_JP","UPDATE_CODE_JP"]
 column_need_EN = ["PNAC_EN", "UNIQUE_STORY_INDEX_EN", "HEADLINE_ALERT_TEXT_EN",
                   "TAKE_TEXT_EN","UPDATE_CODE_EN"]
+column_need_ZH = ["PNAC_ZH", "UNIQUE_STORY_INDEX_ZH", "HEADLINE_ALERT_TEXT_ZH",
+                  "TAKE_TEXT_ZH","UPDATE_CODE_ZH"]
 df_text_jp = pd.DataFrame()
 df_text_en = pd.DataFrame()
+df_text_zh = pd.DataFrame()
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -59,10 +74,11 @@ if args.textout:
     
 base_path = "/data/data_wzh/RTRS/"+str(year)+"/"
 work_path = "~/research/data_prepare/"
-file_name = str(year)+"_merge_jp_en.csv"
-file_name2 = str(year)+"_cleaned_jp_en.csv"
+file_name = str(year)+"_merge_jp_en_zh.csv"
+file_name2 = str(year)+"_cleaned_jp_en_zh.csv"
 file_name_text_en = str(year)+"_corpus_en.txt"
 file_name_text_jp = str(year)+"_corpus_jp.txt"
+file_name_text_zh = str(year)+"_corpus_zh.txt"
     
 # --- Load CSV file with JP and EN filtering --- #
 if retrieve_from_db:
@@ -82,9 +98,15 @@ if retrieve_from_db:
             df_month_en = df[df["LANGUAGE"].isin(["EN"])
                              & df["EVENT_TYPE"].isin(["STORY_TAKE_OVERWRITE"])]
                              #& not((df["HEADLINE_ALERT_TEXT"].str.contains("TABLE")))]
+               
+            # Filter out the Chinese articles
+            df_month_zh = df[df["LANGUAGE"].isin(["ZH"])
+                             & df["EVENT_TYPE"].isin(["STORY_TAKE_OVERWRITE"])
+                             & df["TAKE_TEXT"].str.contains("點選\[ID:")] #\*\*\*\*如欲參考原文報導，請
 
             # Extract the reference code for Japanese news [会有警告，为何？]
             df_month_jp["reference_code"] = df_month_jp["TAKE_TEXT"].str.extract('参照番号\\[([\\w]+)\\]')
+            df_month_zh["reference_code"] = df_month_zh["TAKE_TEXT"].str.extract('\[ID:([\\w]+)\]')
 
             # Drop the row where reference code is NaN
             df_month_jp = df_month_jp.dropna(subset=["reference_code"])
@@ -92,19 +114,24 @@ if retrieve_from_db:
             # Extract update code for all news
             df_month_en["update_code"] = df_month_en["HEADLINE_ALERT_TEXT"].str.extract('UPDATE[\s]*([1-9])')
             df_month_jp["update_code"] = df_month_jp["HEADLINE_ALERT_TEXT"].str.extract('UPDATE[\s]*([1-9])')
+            df_month_zh["update_code"] = df_month_zh["HEADLINE_ALERT_TEXT"].str.extract('UPDATE[\s]*([1-9])')
             
             df_month_en["update_code"] = df_month_en["update_code"].fillna(value = 1)
             df_month_jp["update_code"] = df_month_jp["update_code"].fillna(value = 1)
+            df_month_zh["update_code"] = df_month_zh["update_code"].fillna(value = 1)
             
             #Extract part of "CORRECTED"
             df_month_en["corrected"] = df_month_en["HEADLINE_ALERT_TEXT"].str.extract('(CORRECTED)')
             df_month_jp["corrected"] = df_month_jp["HEADLINE_ALERT_TEXT"].str.extract('(訂正)')
+            df_month_zh["corrected"] = df_month_zh["HEADLINE_ALERT_TEXT"].str.extract('(訂正)')
             
             df_month_en["corrected"] = df_month_en["corrected"].where(df_month_en["corrected"].isnull(), 1)
             df_month_jp["corrected"] = df_month_jp["corrected"].where(df_month_jp["corrected"].isnull(), 1)
+            df_month_zh["corrected"] = df_month_zh["corrected"].where(df_month_zh["corrected"].isnull(), 1)
             
             df_month_en["corrected"] = df_month_en["corrected"].fillna(value = 0)
             df_month_jp["corrected"] = df_month_jp["corrected"].fillna(value = 0)
+            df_month_zh["corrected"] = df_month_zh["corrected"].fillna(value = 0)
             
             
             # Find the English news basing on the Japanese news
@@ -112,6 +139,11 @@ if retrieve_from_db:
                                       df_month_en[column_need[:-1]].reset_index(),
                                       left_on=['reference_code', "update_code","corrected"],
                                       right_on=['PNAC',"update_code","corrected"],
+                                      how="left").dropna()
+            df_month_merge = pd.merge(df_month_merge.reset_index(),
+                                      df_month_zh[column_need].reset_index(),
+                                      left_on=['reference_code', "update_code","corrected"],
+                                      right_on=['reference_code', "update_code","corrected"],
                                       how="left").dropna()
             list_merge.append(df_month_merge)
 
@@ -160,7 +192,7 @@ else:
 def clean_symbol(sentence):
     
     sentence = re.sub("http:\/\/([^/:]+)(:\d*)?([^# ]*)","",sentence)
-    sentence = sentence.replace("-", " ")
+    #sentence = sentence.replace("-", " ")
     sentence = sentence.replace("=", " ")
     sentence = sentence.replace(".", "\n")
     sentence = sentence.replace("。", "\n")
@@ -168,7 +200,7 @@ def clean_symbol(sentence):
     sentence = re.sub("<.*>","",sentence)
     sentence = re.sub("[\<]*[\s]*[\^]+","",sentence)
     sentence = re.sub("\[.*\]","",sentence)
-    sentence = re.sub("\(.*\)","",sentence)
+    #sentence = re.sub("\(.*\)","",sentence)
     sentence = re.sub("^UPDATE[\s]*[0-9]+","UPDATE",sentence)
     sentence = re.sub("^WARPUP[\s]*[0-9]+","WARPUP",sentence)
     
@@ -407,6 +439,20 @@ def clean_tag_en(tagged_text_en):
 
     return newLine1
 
+def clean_tag_zh(sentence):
+    
+    sentence = clean_symbol(sentence)
+
+    sentence = re.sub(r"[\(（]+完[\)）][\s\S]*.*", '',sentence)
+    sentence = re.sub(r'[0-9]|/d+','',sentence)
+    #print(sentence)
+    seg_list = jieba.cut(clean_symbol(sentence), cut_all=False)
+    text_seg = " ".join([word for word in seg_list if (word not in all_punc and word not in stop_words)])
+    #word not in all_punc and
+    
+    return text_seg
+    
+    
 # 一句一行的准备
 def cleanjp(centences_jp):
     return([tagging_jp_wzh(line) for line in centences_jp])
@@ -414,6 +460,8 @@ def cleanjp(centences_jp):
 def cleanen(centences_en):
     return([clean_tag_en(tagging_en(line)) for line in centences_en])
 
+def cleanzh(centences_zh):
+    pass
 
 
 if preprocessing:
@@ -421,7 +469,7 @@ if preprocessing:
     if not retrieve_from_db:
         df_merge = pd.read_csv(work_path + file_name)
             
-    df_title = df_merge[["HEADLINE_ALERT_TEXT_x","HEADLINE_ALERT_TEXT_y"]]
+    df_title = df_merge[["HEADLINE_ALERT_TEXT_x","HEADLINE_ALERT_TEXT_y", "HEADLINE_ALERT_TEXT"]]
 
         # --- Pre-processing for Japanese --- #
     df_title["head_tagged_jp"] = df_title["HEADLINE_ALERT_TEXT_x"].apply(tagging_jp_wzh_2)
@@ -434,8 +482,9 @@ if preprocessing:
 
 
         #df_title[["head_tagged_en", "head_tagged_jp"]].to_csv(work_path + file_name2, encoding = "utf-8")
+    df_title["head_tagged_zh"] = df_title["HEADLINE_ALERT_TEXT"].apply(clean_tag_zh)
         #using wzh version
-    df_title[["head_tagged_en", "head_tagged_jp"]].to_csv(work_path + file_name2, encoding = "utf-8",index = False)
+    df_title.to_csv(work_path + file_name2, encoding = "utf-8",index = False)
         # df_title.to_json("test.json")
         #
         # df = pd.read_json(df_title)
@@ -464,6 +513,11 @@ if textout:
     #df_text_en["TAKE_TEXT_y"] = df_merge["TAKE_TEXT_y"].str.split('.').apply(cleanen)# 不需要每行分句子
     #df_text_en["TAKE_TEXT_y"] = [clean_tag_en(tagging_en(line)) for line in df_text_en["TAKE_TEXT_y"]]
     df_text_en.to_csv(work_path + file_name_text_en ,sep='\n', encoding = "utf-8", index=False, header=False)
+    
+    df_text_zh["HEADLINE_ALERT_TEXT"] = df_title["head_tagged_zh"]
+    df_text_zh["TAKE_TEXT"] = df_merge["TAKE_TEXT"].apply(clean_tag_zh)
+    
+    df_text_zh.to_csv(work_path + file_name_text_zh ,sep='\n', encoding = "utf-8", index=False, header=False)
     
 
     

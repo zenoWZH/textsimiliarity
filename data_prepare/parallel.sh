@@ -1,6 +1,6 @@
-for year in {2003..2013}
+for year in {2003..2014}
 do
     (
-        python retreive_news.py --year=$year --preprocess=True --textout=True
+        python retrieve_news_jpenzh.py --retrieve=True --year=$year --preprocess=True --textout=True
     )&
 done
