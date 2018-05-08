@@ -114,7 +114,7 @@ if retrieve_from_db:
             # Extract update code for all news
             df_month_en["update_code"] = df_month_en["HEADLINE_ALERT_TEXT"].str.extract('UPDATE[\s]*([1-9])')
             df_month_jp["update_code"] = df_month_jp["HEADLINE_ALERT_TEXT"].str.extract('UPDATE[\s]*([1-9])')
-            df_month_zh["update_code"] = df_month_zh["HEADLINE_ALERT_TEXT"].str.extract('UPDATE[\s]*([1-9])')
+            df_month_zh["update_code"] = df_month_zh["HEADLINE_ALERT_TEXT"].str.extract('更新版[\s]*([1-9])')
             
             df_month_en["update_code"] = df_month_en["update_code"].fillna(value = 1)
             df_month_jp["update_code"] = df_month_jp["update_code"].fillna(value = 1)
@@ -199,7 +199,7 @@ def clean_symbol(sentence):
     sentence = re.sub("<.*>","",sentence)
     sentence = re.sub("<.*>","",sentence)
     sentence = re.sub("[\<]*[\s]*[\^]+","",sentence)
-    sentence = re.sub("\[.*\]","",sentence)
+    #sentence = re.sub("\[.*\]","",sentence)
     #sentence = re.sub("\(.*\)","",sentence)
     sentence = re.sub("^UPDATE[\s]*[0-9]+","UPDATE",sentence)
     sentence = re.sub("^WARPUP[\s]*[0-9]+","WARPUP",sentence)
@@ -436,6 +436,10 @@ def clean_tag_en(tagged_text_en):
     newLine1 = newLine1.replace("\/", " ")
     
     newLine1 = newLine1.replace("*", " ")
+    
+    newLine1 = newLine1.replace("u s", "US")
+    
+    newLine1 = newLine1.replace("e u", "EU")
 
     return newLine1
 
@@ -484,7 +488,7 @@ if preprocessing:
         #df_title[["head_tagged_en", "head_tagged_jp"]].to_csv(work_path + file_name2, encoding = "utf-8")
     df_title["head_tagged_zh"] = df_title["HEADLINE_ALERT_TEXT"].apply(clean_tag_zh)
         #using wzh version
-    df_title.to_csv(work_path + file_name2, encoding = "utf-8",index = False)
+    df_title.to_csv(work_path + file_name2, encoding = "utf-8",index = False, header=False)
         # df_title.to_json("test.json")
         #
         # df = pd.read_json(df_title)
