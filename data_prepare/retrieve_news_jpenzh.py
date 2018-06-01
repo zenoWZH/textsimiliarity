@@ -192,10 +192,11 @@ else:
 def clean_symbol(sentence):
     
     sentence = re.sub("http:\/\/([^/:]+)(:\d*)?([^# ]*)","",sentence)
+    sentence = re.sub("\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*",'',sentence)
     #sentence = sentence.replace("-", " ")
     sentence = sentence.replace("=", " ")
-    sentence = sentence.replace(".", "\n")
-    sentence = sentence.replace("。", "\n")
+    sentence = sentence.replace(".", " ")
+    sentence = sentence.replace("。", " ")
     sentence = re.sub("<.*>","",sentence)
     sentence = re.sub("<.*>","",sentence)
     sentence = re.sub("[\<]*[\s]*[\^]+","",sentence)
@@ -203,6 +204,7 @@ def clean_symbol(sentence):
     #sentence = re.sub("\(.*\)","",sentence)
     sentence = re.sub("^UPDATE[\s]*[0-9]+","UPDATE",sentence)
     sentence = re.sub("^WARPUP[\s]*[0-9]+","WARPUP",sentence)
+    sentence = re.sub("\+[\s0-9-]+",'',sentence)                 #phone number
     
     
     # Output for normal tagging
@@ -437,9 +439,9 @@ def clean_tag_en(tagged_text_en):
     
     newLine1 = newLine1.replace("*", " ")
     
-    newLine1 = newLine1.replace("u s", "US")
+    newLine1 = newLine1.replace("u s ", "US ")
     
-    newLine1 = newLine1.replace("e u", "EU")
+    newLine1 = newLine1.replace("e u ", "EU ")
 
     return newLine1
 
