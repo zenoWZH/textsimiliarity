@@ -96,7 +96,8 @@ if retrieve_from_db:
 
             # Filter out the English articles
             df_month_en = df[df["LANGUAGE"].isin(["EN"])
-                             & df["EVENT_TYPE"].isin(["STORY_TAKE_OVERWRITE"])]
+                             & df["EVENT_TYPE"].isin(["STORY_TAKE_OVERWRITE"])
+                             & not((df["HEADLINE_ALERT_TEXT"].str.contains("WRAPUP")))]
                              #& not((df["HEADLINE_ALERT_TEXT"].str.contains("TABLE")))]
                
             # Filter out the Chinese articles
