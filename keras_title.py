@@ -24,10 +24,22 @@ from keras.preprocessing import sequence
 from keras.layers import Input, Embedding, LSTM, Dense, Dropout, Bidirectional
 from keras.models import Model
 # from copy import deepcopy
+base_path = "/home/R2016hwang/research/"
+model_name_en = base_path + "word2vec/model_CBOW_en_200_wzh.w2v"
+model_name_jp = base_path + "word2vec/model_CBOW_jp_200_wzh.w2v"
+model_name_zh = base_path + "word2vec/model_CBOW_zh_200_wzh.w2v"
 
-base_path = "/home/M2015eliu/cas/2017.1.1~LiuSTM/"
-model_name_en = base_path + "data/model-en/W2Vmodle.bin"
-model_name_jp = base_path + "data/model-jp/W2Vmodle.bin"
+model_en = word2vec.Word2Vec.load(model_name_en)  # type: object
+model_jp = word2vec.Word2Vec.load(model_name_jp)
+model_zh = word2vec.Word2Vec.load(model_name_zh)
+
+trans_jp_en = np.load("word2vec/jp_en_200.npy")
+trans_zh_en = np.load("word2vec/zh_en_200.npy")
+
+#datapath = base_path + "data_prepare/cleaned_jp_en_zh.csv"
+#base_path = "/home/M2015eliu/cas/2017.1.1~LiuSTM/"
+#model_name_en = base_path + "data/model-en/W2Vmodle.bin"
+#model_name_jp = base_path + "data/model-jp/W2Vmodle.bin"
 
 model_en = word2vec.Word2Vec.load(model_name_en)
 model_jp = word2vec.Word2Vec.load(model_name_jp)
@@ -59,15 +71,34 @@ print("------------------------------")
 random.seed(1234)
 
 " Padding the sequence"
+#def padding(sequence, maxlen=maxlen, padding_value=0.0):
+#    np_sequance = np.array(sequence)
+#    # print(np_sequance.shape)
+#    if np_sequance.shape[0] < maxlen:
+#        z = np.zeros((maxlen, 200))
+#        z[:np_sequance.shape[0], :np_sequance.shape[1]] = np_sequance
+#    else:
+#        z = np_sequance[:maxlen, :]
+#    return z
+
+INPUT_SIZE = dim_lstm
+
 def padding(sequence, maxlen=maxlen, padding_value=0.0):
     np_sequance = np.array(sequence)
-    # print(np_sequance.shape)
+    #print(np_sequance.shape)
+    if np_sequance.shape[0] == 0:
+        #return float('nan')
+        print("长度为零")
+        #return float('nan')
+        return np.zeros((maxlen, INPUT_SIZE))
     if np_sequance.shape[0] < maxlen:
-        z = np.zeros((maxlen, 200))
+        z = np.zeros((maxlen, INPUT_SIZE))
+    #    print(z.shape)
         z[:np_sequance.shape[0], :np_sequance.shape[1]] = np_sequance
     else:
         z = np_sequance[:maxlen, :]
     return z
+
 
 """
 Find the ranking results with respect to real pairs
@@ -317,17 +348,20 @@ def doc2vec_jp(doc):
 
 
 # def prepare_train(dir_en, dir_jp):
-def prepare_train(dir_en_jp, start=None, end=None):
-
+def prepare_train(dir_en_jp, second_language="jp", start=None, end=None):
     # df_en_mapping = pd.read_csv(dir_en)
     # df_jp_mapping = pd.read_csv(dir_jp)
+    second_article = second_language + "_article"
 
-    df_en_jp = pd.read_csv(dir_en_jp, names=["en_article","jp_article"], header=0)
+    df_en_jp = pd.read_csv(dir_en_jp,
+                           names=["HEADLINE_ALERT_TEXT_x", "HEADLINE_ALERT_TEXT_y", "HEADLINE_ALERT_TEXT", "jp_article",
+                                  "en_article", "zh_article"],
+                           header=0)
     df_en_mapping = df_en_jp[["en_article"]].iloc[start:end]
-    df_jp_mapping = df_en_jp[["jp_article"]].iloc[start:end]
+    df_jp_mapping = df_en_jp[[second_article]].iloc[start:end]
 
     print("Reading English Data:", len(df_en_mapping))
-    print("Reading Japanese Data:", len(df_jp_mapping))
+    print("Reading " + second_language + " Data:", len(df_jp_mapping))
 
     sample_size = len(df_en_mapping)
 
@@ -335,9 +369,9 @@ def prepare_train(dir_en_jp, start=None, end=None):
 
     # Convert mapping to list type and then concat to the a list
     print("Merging the English and Japanes news dataframe...")
-    df_train_1 = pd.concat([df_en_mapping, df_jp_mapping], axis = 1)
-    df_train_1['similarity'] = pd.Series(np.ones(sample_size,)*5)
-    df_train_1['dis_similarity'] = pd.Series(np.ones(sample_size,)*1)
+    df_train_1 = pd.concat([df_en_mapping, df_jp_mapping], axis=1)
+    df_train_1['similarity'] = pd.Series(np.ones(sample_size, ) * 5)
+    df_train_1['dis_similarity'] = pd.Series(np.ones(sample_size, ) * 1)
 
     # Remove null line
     print("Drop the null line...")
@@ -345,14 +379,14 @@ def prepare_train(dir_en_jp, start=None, end=None):
     df_train_1 = df_train_1[df_train_1['en_article'] != '<NULL>']
 
     # Expand the training data
-    en_article_wrong = df_train_1.en_article.iloc[random.sample(range(len(df_train_1)),len(df_train_1))]
+    en_article_wrong = df_train_1.en_article.iloc[random.sample(range(len(df_train_1)), len(df_train_1))]
     en_article_wrong.index = df_train_1.index
     print((en_article_wrong == df_train_1.en_article).value_counts())
     df_train_1['en_article_wrong'] = en_article_wrong
 
     # Convert dateframe to list
-    train_1 = df_train_1[['en_article','jp_article','similarity']].values.tolist()
-    train_2 = df_train_1[['en_article_wrong','jp_article','dis_similarity']].values.tolist()
+    train_1 = df_train_1[['en_article', second_article, 'similarity']].values.tolist()
+    train_2 = df_train_1[['en_article_wrong', second_article, 'dis_similarity']].values.tolist()
 
     return train_1, train_2, df_train_1
 
@@ -384,7 +418,7 @@ if __name__ == "__main__":
         # Prepare For the training data
         # dir_en = base_path + "en_news.csv"
         # dir_jp = base_path + "jp_news.csv"
-        dir_en_jp = base_path + "data_preparation/2014_cleaned_jp_en.csv"
+        dir_en_jp = base_path + "data_prepare/cleaned_jp_en_zh.csv"
 
         # pairs_correct, pairs_wrong, df_pairs = prepare_train(dir_en, dir_jp)
         # pairs_correct, pairs_wrong, df_pairs = prepare_train(dir_en_jp)
@@ -454,7 +488,7 @@ if __name__ == "__main__":
 
     X1_train1, X1_test_1, X1_train2, X1_train3_wrong, X1_test_0 = np.split(X_1, [2000, 3000, 5000, 9000])
     X2_train1, X2_test_1, X2_train2, X2_train3_wrong, X2_test_0 = np.split(X_2, [2000, 3000, 5000, 9000])
-    y_train1, y_test, y_train2, y_train3_wrong, Y_o = np.split(y, [2000, 3000, 9000, 9000])
+    y_train1, y_test, y_train2, y_train3_wrong, Y_o = np.split(y, [2000, 3000, 5000, 9000])
 
     X1_train = np.concatenate((X1_train1, X1_train2, X1_train3_wrong), axis = 0)
     X2_train = np.concatenate((X2_train1, X2_train2, X2_train3_wrong), axis = 0)
@@ -552,7 +586,7 @@ if __name__ == "__main__":
         hist = model_lstm2.fit([X1_train, X2_train], [y_train],
                            validation_data=([X1_test, X2_test], y_test),
                            epochs=i+1,
-                           batch_size=32,
+                           batch_size=100,
                            initial_epoch=i)
 
         # Evaluation on test data 1
