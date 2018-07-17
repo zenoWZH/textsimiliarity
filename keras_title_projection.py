@@ -6,6 +6,8 @@ created on 2017/07/06
 @author: liuenda
 """
 
+import gc
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -57,7 +59,7 @@ bias_y = 0
 loss_function = "mse"
 mode = "reg"  # reg, binary
 rnn_type = "bi-lstm"  # lstm, bi-lstm
-bi_lstm_mode = "sum"  # concat, sum
+bi_lstm_mode = "concat"  # concat, sum
 print("maxlen", maxlen, "epoch", epoch, "dim_lstm", dim_lstm)
 print("dim_Dense", dim_1)
 print("dropout_rate", dropout_rate, ", LSTM type:", rnn_type, bi_lstm_mode)
@@ -685,14 +687,14 @@ if __name__ == "__main__":
             test_loss.append(hist.history['val_loss'])
 
             # Evaluation on test data 1
-            sim_results_test, rank_results_test = find_ranking_quick(X1_test,
-                                                                     X2_test,
-                                                                     model_lstm2)
+            #sim_results_test, rank_results_test = find_ranking_quick(X1_test,
+            #                                                         X2_test,
+            #                                                         model_lstm2)
 
             # Evaluation on test data 2
-            sim_results_test2, rank_results_test2 = find_ranking_quick(features_en_new,
-                                                                 features_jp_new,
-                                                                 model_lstm2)
+            #sim_results_test2, rank_results_test2 = find_ranking_quick(features_en_new,
+            #                                                     features_jp_new,
+            #                                                     model_lstm2)
             
             
             # Save the mdoel
@@ -700,18 +702,48 @@ if __name__ == "__main__":
 
             # Evaluation
 
-            for i in [1,5,10]:
-                top = (pd.Series(rank_results_test) <= i).sum()
-                tops[i].append(top)
-                print("TOP", i, top)
+            #for i in [1,5,10]:
+            #    top = (pd.Series(rank_results_test) <= i).sum()
+            #    tops[i].append(top)
+            #    print("TOP", i, top)
 
-                top_test = (pd.Series(rank_results_test2) <= i).sum()
-                tops_test[i].append(top_test)
-                print("[T] TOP", i, top_test)
+            #    top_test = (pd.Series(rank_results_test2) <= i).sum()
+            #    tops_test[i].append(top_test)
+            #    print("[T] TOP", i, top_test)
 
             # release memory
-            del rank_results_test, rank_results_test2, sim_results_test, sim_results_test2
-            gc.collect()
+            #del rank_results_test, rank_results_test2, sim_results_test, sim_results_test2
+            #gc.collect()
+
+        sim_results_test, rank_results_test = find_ranking_quick(X1_test_1,
+                                                                 X2_test_1,
+                                                                 model_lstm2)
+
+        # Evaluation on test data 2
+        sim_results_test2, rank_results_test2 = find_ranking_quick(features_en_new,
+                                                                   features_jp_new,
+                                                                   model_lstm2)
+        # print(sim_results_test)
+        # print(rank_results_test)
+        # print(sim_results_test2)
+        # print(rank_results_test2)
+        # Save the mdoel
+        # saved_model.append(model_lstm2.get_weights())
+
+        # Evaluation
+
+        for i in [1, 5, 10]:
+            top = (pd.Series(rank_results_test) <= i).sum()
+            tops[i].append(top)
+            print("TOP", i, top)
+
+            top_test = (pd.Series(rank_results_test2) <= i).sum()
+            tops_test[i].append(top_test)
+            print("[T] TOP", i, top_test)
+
+            # release memory
+        del rank_results_test, rank_results_test2, sim_results_test, sim_results_test2
+        gc.collect()
     # # Save the history and the model
     #code = "proj"
     #path_model_lstm2 = "model_lstm2_" + code
